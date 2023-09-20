@@ -18,10 +18,49 @@
 
 FICHIER=$(realpath "$1")
 VIRUS_BDD=./empreintes.txt
-USAGE="usage : ./antivirus.sh [file or directory]"
+
 
 ##########################################################################################################################
 ##################################################### FONCTIONS ##########################################################
+
+############# Options ############
+
+aide(){
+   # Affiche l'aide
+   echo "Scanne un fichier ou un répertiore de manière récursive ou non"
+   echo ""
+   echo "Usage: ./antivirus_2 [file|repository]"
+   quitter
+}
+
+
+############# Utiles ############
+
+fingerprint256(){
+	# calculer l'empreinte sha256 sans le nom de fichier à la fin
+    sha256sum $1 | cut -d " " -f 1
+}
+
+
+quitter(){
+	read -n 1 _
+	clear
+	exit 0
+}
+
+
+########### Chiffrement/Déchiffrement ##########
+
+dechiffre(){
+	# dechiffre le fichier passé en argument
+	gpg $1
+	rm -i $1
+	echo "Fichier déchiffré."
+	quitter
+}
+
+
+########### Chiffrement/Déchiffrement ##########
 
 bloqueur() {
     local chemin="$1"
@@ -35,11 +74,6 @@ bloqueur() {
 		 "N" | "n" | "NO" | "no" ) echo "Fichier clair" ;;
 								*) chiffreFichier $chemin ;;
 	esac
-}
-
-
-fingerprint256(){
-    sha256sum $1 | cut -d " " -f 1
 }
 
 
@@ -67,7 +101,7 @@ compareEmpreinte(){
 		# si l'empreinte en cours correspond à celle à analyser
 		empreinteVirusShort=$(echo $empreinteVirus | cut -d" " -f 1)
 		[ $empreinteFichier == $empreinteVirusShort ] && return 1
-	done < empreintes.txt
+	done < VIRUS_BDD
 	return 0
 }
 
@@ -77,7 +111,7 @@ chiffreFichier(){
 	gpg -c $1
 	FICHIER_CHIFFRE="$1".gpg
 	echo "Fichier chiffré"
-	sudo rm -i $1
+	rm -i $1
 }
 
 
@@ -87,6 +121,7 @@ scanneRepertoire(){
 			scanneFichier $fichier
 		fi
 	done
+	echo "Rien (de plus) à déclarer"
 }
 
 
@@ -98,6 +133,7 @@ scanneRepertoireRecursif(){
 			cheminRepertoire=$(realpath $fichier) && scanneRepertoireRecursif $cheminRepertoire
 		fi
 	done
+	echo "Rien (de plus) à déclarer"
 }
 
 
@@ -105,6 +141,7 @@ scanneRepertoireRecursif(){
 
 menuRepertoire(){
 	# partie graphique
+	logo
 	choixRepertoireRecursif
 
 	read choix
@@ -122,9 +159,9 @@ menuRepertoire(){
 logo(){
 echo ""
 echo ""
-echo "!!!!!!!!!!!!!!!!!!"
-echo "!!!! ANTIVRUS !!!!"
-echo "!!!!!!!!!!!!!!!!!!"
+echo "	!!!!!!!!!!!!!!!!!!!"
+echo "	!!!! ANTIVIRUS !!!!"
+echo "	!!!!!!!!!!!!!!!!!!!"
 echo ""
 echo ""
 }
@@ -144,18 +181,26 @@ choixRepertoireRecursif(){
 ##########################################################################################################################
 ####################################################### SCRIPT ###########################################################
 
+clear
 
-## CHOIX DU MODE ##
-clear 
 
-logo
+########### Assertions ###########
+
+# ! BDD inexistante
+[ ! -f VIRUS_BDD ] && echo "Abscence de la base de données d'empreintes de virus !" &&  quitter
+# ! BDD vide
+[ ! -s VIRUS_BDD ] && echo "La base de données d'empreintes de virus est vide !" && quitter
+
+
+########### Conditions de base ###########
 
 if [[ -d $FICHIER ]] ; then
 	menuRepertoire $FICHIER
 elif [[ -f $FICHIER ]] ; then
+	[[ $FICHIER == "*.gpg" ]] ; dechiffre $FICHIER
 	scanneFichier $FICHIER
 else
-	echo $USAGE
+	aide
 fi
 
 
