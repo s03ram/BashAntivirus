@@ -101,7 +101,7 @@ compareEmpreinte(){
 		# si l'empreinte en cours correspond à celle à analyser
 		empreinteVirusShort=$(echo $empreinteVirus | cut -d" " -f 1)
 		[ $empreinteFichier == $empreinteVirusShort ] && return 1
-	done < VIRUS_BDD
+	done < $VIRUS_BDD
 	return 0
 }
 
