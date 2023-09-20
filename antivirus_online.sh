@@ -45,5 +45,5 @@ curl --request POST \
      --url https://www.virustotal.com/api/v3/files \
      --header 'accept: application/json' \
      --header 'content-type: multipart/form-data' \
-     --header 'x-apikey: 834e98d9b93ca8524976042e632effd87f61eb4b6740573322510ddbd0548608' \
+     --header 'x-apikey: example' \
      --form file=@antivirus_2.sh
