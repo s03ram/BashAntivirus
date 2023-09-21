@@ -10,6 +10,7 @@
 # Fonctionnement : 	Si l'argument est un dossier, on propose de scanner récursivement. 
 #					Scanner : comparer l'empreinte (sha256) des fichiers avec celles présentes dans la bdd
 # Dépendance :		GnuPG
+# Contraintes :		Avoir de droit de lecture des dossiers à analyser
 ############################
 
 
@@ -44,7 +45,7 @@ fingerprint256(){
 
 quitter(){
 	read -n 1 _
-	clear
+	#clear
 	exit 0
 }
 
@@ -60,7 +61,16 @@ dechiffre(){
 }
 
 
-########### Chiffrement/Déchiffrement ##########
+chiffreFichier(){
+	# chiffre avec gpg le fichier passé en argument
+	gpg -c $1
+	FICHIER_CHIFFRE="$1".gpg
+	echo "Fichier chiffré"
+	rm -i $1
+}
+
+
+########### Principales ##########
 
 bloqueur() {
     local chemin="$1"
@@ -77,23 +87,14 @@ bloqueur() {
 }
 
 
-scanneFichier(){
-	# si l'empreinte du fichier est dans la base de données, demander quoi faire
-	# $1 : chemin du fichier à scanner
-	clear
-	compareEmpreinte $1
-	est_present=$?
-
-	if [[ $est_present -eq 1 ]] ; then
-		bloqueur $1
-	fi
-}
-
-
 compareEmpreinte(){
     # $1 = fingerprint to compare with the db of virusfp
     # return 1 for match, else 0
+
+	# si on les a pas, se donner le droit de lecture
+	[[ ! -r $1 ]] && permissionLecture=1 && chmod +r $1
     
+	# calcul de l'empreinte en cours
 	empreinteFichier=$(fingerprint256 $1)
 
 	#parcours toutes les empreintes de la bdd
@@ -102,16 +103,24 @@ compareEmpreinte(){
 		empreinteVirusShort=$(echo $empreinteVirus | cut -d" " -f 1)
 		[ $empreinteFichier == $empreinteVirusShort ] && return 1
 	done < $VIRUS_BDD
+
+	[[ $permissionLecture -eq 1 ]] && chmod -r $1
+	permissionLecture=0
+
 	return 0
 }
 
 
-chiffreFichier(){
-	# chiffre avec gpg le fichier passé en argument
-	gpg -c $1
-	FICHIER_CHIFFRE="$1".gpg
-	echo "Fichier chiffré"
-	rm -i $1
+scanneFichier(){
+	# si l'empreinte du fichier est dans la base de données, demander quoi faire
+	# $1 : chemin du fichier à scanner
+	#clear
+	compareEmpreinte $1
+	est_present=$?
+
+	if [[ $est_present -eq 1 ]] ; then
+		bloqueur $1
+	fi
 }
 
 
@@ -137,7 +146,7 @@ scanneRepertoireRecursif(){
 }
 
 
-############# MENU ############
+############# Menu ############
 
 menuRepertoire(){
 	# partie graphique
@@ -154,7 +163,7 @@ menuRepertoire(){
 }
 
 
-########## GRAPHIQUE ##########
+########## Graphique ##########
 
 logo(){
 echo ""
@@ -181,24 +190,35 @@ choixRepertoireRecursif(){
 ##########################################################################################################################
 ####################################################### SCRIPT ###########################################################
 
-clear
+#clear
 
 
 ########### Assertions ###########
 
+
 # ! BDD inexistante
-[ ! -f VIRUS_BDD ] && echo "Abscence de la base de données d'empreintes de virus !" &&  quitter
+[ ! -f $VIRUS_BDD ] && echo "Abscence de la base de données d'empreintes de virus !" &&  quitter
 # ! BDD vide
-[ ! -s VIRUS_BDD ] && echo "La base de données d'empreintes de virus est vide !" && quitter
+[ ! -s $VIRUS_BDD ] && echo "La base de données d'empreintes de virus est vide !" && quitter
 
 
 ########### Conditions de base ###########
 
+
+# droits de lecture
+chmod +r $FICHIER
+
 if [[ -d $FICHIER ]] ; then
 	menuRepertoire $FICHIER
+
 elif [[ -f $FICHIER ]] ; then
-	[[ $FICHIER == "*.gpg" ]] ; dechiffre $FICHIER
+	# on récupère le type de fichier
+	extension=$(file $FICHIER | cut -d" " -f 2)
+	# si c'est un GPG, on le déchiffre
+	[ $extension == "GPG" ] && dechiffre $FICHIER
+	# sinon on le scanne
 	scanneFichier $FICHIER
+
 else
 	aide
 fi
